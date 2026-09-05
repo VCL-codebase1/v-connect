@@ -74,3 +74,5 @@ Database integration tests were run in an isolated PostgreSQL 15 container with 
 - No customer data or real VPS credentials are embedded in the demo. Client code never receives the global Evolution key.
 
 See `DEPLOYMENT.md` for VPS operations and backups.
+
+Updated deployment notes.
