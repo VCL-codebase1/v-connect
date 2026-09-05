@@ -1,0 +1,10 @@
+.env*
+!.env.example
+node_modules
+.next
+.git
+/supabase/
+/tests/
+DEPLOYMENT.md
+AGENTS.md
+CLAUDE.md
