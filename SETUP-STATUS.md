@@ -3,7 +3,7 @@
 Updated September 5, 2026.
 
 - Supabase project: `iktenrvmriqzsmixafsc`.
-- Workspace and broadcast schemas installed in Supabase: six `vc_*` tables with RLS, including the shared rate-limit table.
+- Workspace, broadcast, and real-time inbox schemas are installed in Supabase with RLS and a restricted Realtime event publication.
 - Isolation, invitation, role, revocation, and rate-limit tests passed against the real Supabase database inside rollback-only transactions.
 - Public Supabase API rejects anonymous workspace reads.
 - VPS API: `https://vcglengineering.tech`, served by Caddy with automatic TLS renewal.
