@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { normalizePhone } from '@/lib/phone';
 export const workspaceId = z.uuid();
 export const name = z.string().trim().min(2).max(60);
+const sendMessage = z.object({ action: z.literal('send'), workspaceId, numberId: z.uuid(), phone: z.string().min(7).max(24), countryCode: z.string().regex(/^[1-9][0-9]{0,3}$/).default('234'), text: z.string().trim().min(1).max(4000) }).refine(value => { try { normalizePhone(value.phone,value.countryCode); return true; } catch { return false; } }, { path:['phone'], message:'Invalid phone number' }).transform(value => ({ ...value, phone: normalizePhone(value.phone,value.countryCode) }));
 export const numberAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), workspaceId, label: z.string().trim().min(1).max(60) }),
   z.object({ action: z.literal('connect'), workspaceId, numberId: z.uuid() }),
-  z.object({ action: z.literal('send'), workspaceId, numberId: z.uuid(), phone: z.string().regex(/^\+?[1-9][0-9]{7,14}$/).transform(s => s.replace(/^\+/, '')), text: z.string().trim().min(1).max(4000) }),
+  sendMessage,
 ]);
 export const teamAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('invite'), workspaceId, email: z.email().max(254), role: z.enum(['admin', 'member']) }),

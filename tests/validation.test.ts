@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { broadcastAction, inboxQuery, inboxReply, numberAction, teamAction, safeNext } from '../lib/validation';
 const workspaceId = '62c3ba2d-b351-4172-a8b9-fc8abf5f854e';
 const numberId = '8174b955-765c-44d5-8830-05339cc3810d';
-test('message destinations require international phone numbers, not arbitrary JIDs', () => {
+test('message destinations accept local formatting but reject arbitrary identifiers', () => {
   const base = { action: 'send', workspaceId, numberId, text: 'Hello' };
-  for (const phone of ['123', '0' + '1'.repeat(9), '123456789@g.us', '+234 8012345678', 'https://evil.example', '1'.repeat(16)]) assert.equal(numberAction.safeParse({ ...base, phone }).success, false);
+  for (const phone of ['123', '123456789@g.us', 'https://evil.example', '1'.repeat(16)]) assert.equal(numberAction.safeParse({ ...base, phone }).success, false);
+  assert.equal((numberAction.parse({ ...base, phone: '0801 234 5678' }) as { phone: string }).phone, '2348012345678');
   assert.equal((numberAction.parse({ ...base, phone: '+2348012345678' }) as { phone: string }).phone, '2348012345678');
 });
 test('reject missing tenant IDs and oversized or empty messages', () => {
