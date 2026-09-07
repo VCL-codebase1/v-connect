@@ -4,4 +4,6 @@ export type WhatsAppNumber = { id: string; workspace_id: string; label: string; 
 export type Member = { user_id: string; email: string; role: Role; joined_at: string };
 export type Contact = { id: string; phone: string; name: string };
 export type Broadcast = { id: string; name: string; message: string; status: 'sending' | 'completed' | 'partial' | 'failed'; recipient_count: number; sent_count: number; failed_count: number; created_at: string; completed_at?: string; number_label?: string };
+export type InboxChat = { id: string; name: string; preview: string; timestamp?: number; unread: number; group: boolean };
+export type InboxMessage = { id: string; text: string; timestamp: number; fromMe: boolean; status?: string };
 export type DashboardData = { user: { email: string }; workspaces: Workspace[]; numbers: WhatsAppNumber[]; members: Member[]; error?: string };

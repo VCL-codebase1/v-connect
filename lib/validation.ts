@@ -12,6 +12,9 @@ export const teamAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('remove'), workspaceId, userId: z.uuid() }),
 ]);
 export const contactsQuery = z.object({ workspaceId, numberId: z.uuid() });
+export const remoteJid = z.string().regex(/^([1-9][0-9]{7,14}@s\.whatsapp\.net|[0-9-]{8,40}@g\.us)$/);
+export const inboxQuery = z.object({ workspaceId, numberId: z.uuid(), remoteJid: remoteJid.optional() });
+export const inboxReply = z.object({ workspaceId, numberId: z.uuid(), remoteJid, text: z.string().trim().min(1).max(4000) });
 const broadcastRecipient = z.object({ phone: z.string().regex(/^\+?[1-9][0-9]{7,14}$/).transform(s => s.replace(/^\+/, '')), name: z.string().trim().max(120).optional() });
 export const broadcastAction = z.object({
   workspaceId,

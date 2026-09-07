@@ -9,6 +9,7 @@ A mobile-friendly Next.js app for managing multiple WhatsApp numbers across tena
 - Email/password login and email confirmation through Supabase Auth.
 - Multiple WhatsApp instances, connection status, QR device pairing, and individual text messages.
 - Live contacts per connected WhatsApp number and tenant-scoped broadcast history.
+- Instance-scoped inbox with chat search, message history, group chats, and text replies.
 - Permission-confirmed broadcasts for up to 25 recipients, limited to owners and admins.
 - Email-bound, single-use team invitation links and owner-controlled member removal.
 - Database-backed message/connect rate limits shared across serverless instances.
@@ -72,7 +73,8 @@ Database integration tests passed both in an isolated PostgreSQL 15 container an
 - Supabase and public VPS HTTPS are connected. Real signup, confirmation, WhatsApp pairing, and message delivery still need end-to-end verification after you deploy and configure your final confirmation URLs. No real messages were sent during development.
 - Contacts are fetched live from the selected Evolution instance and are not copied into Supabase. Only broadcast metadata, message text, and aggregate delivery counts are stored.
 - Broadcasts are capped at 25 recipients per run, two runs per minute, and 250 recipients per workspace per day. The app does not retry failed recipients automatically.
-- This version does not include a shared inbox, media messages, scheduled campaigns, billing, or incoming-message webhooks.
+- The inbox is read on demand from Evolution API. It currently uses manual refresh; incoming-message webhooks or realtime updates are not configured yet.
+- This version does not include media replies, scheduled campaigns, billing, or incoming-message webhooks.
 - Each workspace can have 20 numbers and each user can own 10 workspaces. Limits are enforced in the database. The VPS’s practical capacity depends on traffic and message history.
 - QR pairing needs a second screen for scanning. Connection statuses update when opening a workspace or pressing refresh.
 - Provider instance creation and database creation are separate operations. If the provider is temporarily unavailable, the database keeps the number; Connect retries provisioning when the instance is missing.
