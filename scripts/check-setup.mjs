@@ -26,6 +26,8 @@ try {
   }
   const anonymous = await get(`${sb}/rest/v1/vc_workspaces?select=id`, sbHeaders);
   report([401,403].includes(anonymous.status), 'Anonymous workspace access is denied');
+  const anonymousCampaigns = await get(`${sb}/rest/v1/vc_campaigns?select=id`, sbHeaders);
+  report([401,403].includes(anonymousCampaigns.status), 'Anonymous campaign access is denied');
   const unauthenticated = await get(`${api}/instance/fetchInstances`, { Origin: origin });
   report(unauthenticated.status === 401, 'Evolution API rejects requests without a key');
   const authenticated = await get(`${api}/instance/fetchInstances`, { Origin: origin, apikey: process.env.EVOLUTION_API_KEY });

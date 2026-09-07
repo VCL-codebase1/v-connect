@@ -70,6 +70,10 @@ To restore, stop the API, preserve the current volumes and configuration, and re
 
 `lib/evolution.ts` contains the server-only request helper used by the Next.js app now in this workspace. Workspace routes check membership and resolve the Evolution instance name from a tenant-scoped database row. The helper refuses redirects and adds the API key and required Origin header. See `README.md` for Supabase setup and Vercel deployment. The global instance-list endpoint is not exposed by the app.
 
+## Campaign delivery worker
+
+The web app stores campaigns in Supabase and returns immediately. `/opt/v-connect-worker` on this VPS runs the single Dockerized campaign worker that claims recipients atomically, personalizes messages, calls Evolution API, and updates progress for Supabase Realtime. See `worker/README.md` for installation and service commands.
+
 ## Pending
 
 - Configure the Supabase email-confirmation redirect URLs in the dashboard (see `SETUP-STATUS.md`).

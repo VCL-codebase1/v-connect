@@ -8,10 +8,10 @@ A mobile-friendly Next.js app for managing multiple WhatsApp numbers across tena
 - Owner, admin, and member access enforced in the API and PostgreSQL RLS.
 - Email/password login and email confirmation through Supabase Auth.
 - Multiple WhatsApp instances, connection status, QR device pairing, and individual text messages.
-- Live contacts per connected WhatsApp number and tenant-scoped broadcast history.
+- Durable broadcast campaigns with reusable audiences, CSV import, message templates, scheduling, personalization, pause/resume/cancel controls, suppression lists, and per-recipient delivery results.
 - Instance-scoped team inboxes with assignments, open/pending/resolved states, unread counters, private notes, and Supabase Realtime refresh signals.
 - Instance-scoped inbox with chat search, message history, group chats, and text replies.
-- Permission-confirmed broadcasts for up to 25 recipients, limited to owners and admins.
+- Permission-confirmed campaigns for up to 5,000 unique recipients, limited to owners and admins and delivered outside Vercel by a VPS worker.
 - Email-bound, single-use team invitation links and owner-controlled member removal.
 - Database-backed message/connect rate limits shared across serverless instances.
 - Responsive dashboard, mobile menu, search, filters, loading states, and accessible native dialogs.
@@ -39,7 +39,11 @@ The existing project `iktenrvmriqzsmixafsc` is already configured and its schema
 4. Enable email/password authentication and email confirmation. Configure production SMTP and Supabase authentication rate limits before inviting customers.
 5. In Auth → URL Configuration, set Site URL to your Vercel production URL and allow `https://v-connect-blond.vercel.app/auth/confirm` and `http://localhost:3000/auth/confirm` as redirect URLs. Set `APP_URL` to the app URL for each deployment environment.
 6. Default PKCE confirmation links work in the browser used to sign up. For cross-device confirmation, customize the confirmation template to point to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`. Users can reopen their invitation link after confirming.
-7. Sign up, confirm your email, sign in, and create a workspace. Owners/admins can add numbers, invite colleagues, and send broadcasts. All workspace members can browse contacts and send individual messages.
+7. Sign up, confirm your email, sign in, and create a workspace. Owners/admins can add numbers, invite colleagues, and create campaigns. All workspace members can browse contacts and send individual messages.
+
+## Campaign worker
+
+Migration `008_campaigns.sql` stores campaign and recipient queues in Supabase. The separate worker in [`worker`](worker/README.md) must run continuously on the VPS for queued and scheduled campaigns to deliver. Vercel only creates and displays campaigns, so a browser or serverless request does not need to remain open.
 
 ## Deploy on Vercel
 
@@ -72,11 +76,11 @@ Database integration tests passed both in an isolated PostgreSQL 15 container an
 ## Operational limits
 
 - Supabase and public VPS HTTPS are connected. Real signup, confirmation, WhatsApp pairing, and message delivery still need end-to-end verification after you deploy and configure your final confirmation URLs. No real messages were sent during development.
-- Contacts are fetched live from the selected Evolution instance and are not copied into Supabase. Only broadcast metadata, message text, and aggregate delivery counts are stored.
+- Contacts are fetched live from the selected Evolution instance. Contacts imported into a saved campaign audience are stored in Supabase with their consent source and time.
 - Inbox message contents remain in Evolution API. Supabase stores one-day refresh signals only. Opening an inbox as an owner or admin configures that instance’s signed webhook after the app has a public HTTPS `APP_URL`.
-- Broadcasts are capped at 25 recipients per run, two runs per minute, and 250 recipients per workspace per day. The app does not retry failed recipients automatically.
+- Campaigns are capped at 5,000 recipients. The worker paces deliveries at three seconds by default, retries only explicit throttling/server failures up to three attempts, and does not retry ambiguous timeouts to avoid duplicate messages.
 - The inbox is read on demand from Evolution API. It currently uses manual refresh; incoming-message webhooks or realtime updates are not configured yet.
-- This version does not include media replies, scheduled campaigns, billing, or incoming-message webhooks.
+- This version does not include media campaigns, billing, or automatic opt-out keyword detection.
 - Each workspace can have 20 numbers and each user can own 10 workspaces. Limits are enforced in the database. The VPS’s practical capacity depends on traffic and message history.
 - QR pairing needs a second screen for scanning. Connection statuses update when opening a workspace or pressing refresh.
 - Provider instance creation and database creation are separate operations. If the provider is temporarily unavailable, the database keeps the number; Connect retries provisioning when the instance is missing.

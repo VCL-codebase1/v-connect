@@ -5,16 +5,16 @@ import { supabaseServer, isConfigured } from '@/lib/supabase/server';
 import { canManage } from '@/lib/validation';
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 export function json(data: unknown, status = 200) { return NextResponse.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } }); }
-export async function body(request: Request) {
+export async function body(request: Request, maxBytes = 20000) {
   const url = new URL(request.url);
   // Next's local request URL may normalize 127.0.0.1 to localhost; Host preserves
   // the browser-facing authority. Never accept a caller-supplied forwarded host.
   const expectedOrigin = `${url.protocol}//${request.headers.get('host') ?? url.host}`;
   if (request.headers.get('origin') !== expectedOrigin) throw new ApiError(403, 'Request origin is not allowed.');
   if (!request.headers.get('content-type')?.startsWith('application/json')) throw new ApiError(415, 'JSON request required.');
-  if (Number(request.headers.get('content-length') ?? 0) > 20000) throw new ApiError(413, 'Request too large.');
+  if (Number(request.headers.get('content-length') ?? 0) > maxBytes) throw new ApiError(413, 'Request too large.');
   const text = await request.text();
-  if (text.length > 20000) throw new ApiError(413, 'Request too large.');
+  if (text.length > maxBytes) throw new ApiError(413, 'Request too large.');
   try { return JSON.parse(text); } catch { throw new ApiError(400, 'Invalid request.'); }
 }
 export async function authenticated() {

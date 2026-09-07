@@ -1,0 +1,12 @@
+services:
+  campaign-worker:
+    build: .
+    container_name: v-connect-campaign-worker
+    env_file: .env
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true

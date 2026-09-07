@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { broadcastAction, inboxQuery, inboxReply, numberAction, teamAction, safeNext } from '../lib/validation';
+import { audienceAction, broadcastAction, campaignAction, inboxQuery, inboxReply, numberAction, teamAction, safeNext } from '../lib/validation';
 const workspaceId = '62c3ba2d-b351-4172-a8b9-fc8abf5f854e';
 const numberId = '8174b955-765c-44d5-8830-05339cc3810d';
 test('message destinations accept local formatting but reject arbitrary identifiers', () => {
@@ -38,4 +38,18 @@ test('inbox requests accept only WhatsApp user and group identifiers', () => {
   assert.equal(inboxQuery.safeParse({ ...base, remoteJid: '225555555555555@lid' }).success, true);
   for (const remoteJid of ['../../instance/fetchInstances', 'person@example.com', 'status@broadcast', '123@evil.example']) assert.equal(inboxQuery.safeParse({ ...base, remoteJid }).success, false);
   assert.equal(inboxReply.safeParse({ ...base, remoteJid: '2348012345678@s.whatsapp.net', text: ' ' }).success, false);
+});
+test('campaigns deduplicate recipients and require explicit consent', () => {
+  const base = { action:'create', workspaceId, numberId, name:'Customer update', text:'Hi {{name}}', scheduledFor:null, confirmed:true as const };
+  const parsed = campaignAction.parse({ ...base, recipients:[{phone:'+2348012345678',name:'Ada'},{phone:'2348012345678',name:'Duplicate'}] });
+  assert.equal(parsed.action,'create');
+  assert.equal(parsed.recipients.length,1);
+  assert.equal(campaignAction.safeParse({...base,confirmed:false,recipients:[{phone:'2348012345678'}]}).success,false);
+  assert.equal(campaignAction.safeParse({...base,recipients:Array.from({length:5001},(_,i)=>({phone:`234${String(i).padStart(11,'0')}`}))}).success,false);
+});
+test('audience imports require consent source data and valid international numbers', () => {
+  const base={action:'createList',workspaceId,name:'Customers',description:'',contacts:[{phone:'2348012345678',name:'Ada',optedInAt:new Date().toISOString(),optInSource:'checkout'}]};
+  assert.equal(audienceAction.safeParse(base).success,true);
+  assert.equal(audienceAction.safeParse({...base,contacts:[{...base.contacts[0],phone:'08012345678'}]}).success,false);
+  assert.equal(audienceAction.safeParse({...base,contacts:[{...base.contacts[0],optInSource:''}]}).success,false);
 });

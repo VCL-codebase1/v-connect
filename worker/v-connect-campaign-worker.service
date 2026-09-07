@@ -1,0 +1,22 @@
+[Unit]
+Description=V Connect campaign delivery worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/v-connect-worker
+EnvironmentFile=/opt/v-connect-worker/.env
+ExecStart=/usr/bin/node /opt/v-connect-worker/campaign-worker.mjs
+Restart=always
+RestartSec=5
+User=vconnect
+Group=vconnect
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/v-connect-worker
+
+[Install]
+WantedBy=multi-user.target

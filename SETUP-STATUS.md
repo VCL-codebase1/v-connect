@@ -3,7 +3,7 @@
 Updated September 5, 2026.
 
 - Supabase project: `iktenrvmriqzsmixafsc`.
-- Workspace, broadcast, and real-time inbox schemas are installed in Supabase with RLS and a restricted Realtime event publication.
+- Workspace, durable campaign, audience, suppression, and real-time inbox schemas are installed in Supabase with RLS and restricted Realtime publications.
 - Isolation, invitation, role, revocation, and rate-limit tests passed against the real Supabase database inside rollback-only transactions.
 - Public Supabase API rejects anonymous workspace reads.
 - VPS API: `https://vcglengineering.tech`, served by Caddy with automatic TLS renewal.
@@ -29,3 +29,7 @@ Email login and sign-up are enabled. Email confirmation is required. Keep confir
 The Evolution CORS allowlist contains `http://localhost:3000`, `https://v-connect-anywork365.vercel.app`, and `https://v-connect-blond.vercel.app`. The app sends the configured Origin header explicitly. The database and Redis remain private; only Caddy exposes ports 80/443.
 
 Run `npm run check:setup` for read-only service checks. It prints no secrets, creates no accounts or numbers, and sends no messages.
+
+## Campaign worker
+
+Migration `008_campaigns.sql` is installed. The Dockerized worker is running from `/opt/v-connect-worker` on the VPS with an owner-only environment file, certificate-verified Supabase TLS, automatic container restart, three-second delivery pacing, and no published ports.
