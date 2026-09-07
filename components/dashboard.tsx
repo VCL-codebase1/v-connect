@@ -66,7 +66,12 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
   }
   async function pair() { await run(async () => { const data = await request('/api/numbers', { action: 'connect', workspaceId: active, numberId: selected?.id }); if (data.base64) setQr(data.base64); else setNotice(data.connected ? 'This number is already connected. Close this panel and refresh.' : 'QR code is preparing. Try again in a few seconds.'); }); }
   async function loadContacts(numberId = contactNumberId) { if (!numberId) return; await run(async () => { const data = await request(`/api/contacts?workspaceId=${encodeURIComponent(active)}&numberId=${encodeURIComponent(numberId)}`); setContacts(data.contacts); setContactsLoaded(true); setSelectedContacts([]); }); }
-  function nav(name: string) { setTab(name); setMobileOpen(false); setQuery(''); }
+  function nav(name: string) {
+    setTab(name);
+    setMobileOpen(false);
+    setQuery('');
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
   return <div className="app-shell">
     {mobileOpen && <button className="mobile-overlay" aria-label="Close menu" onClick={() => setMobileOpen(false)} />}
     <aside className={`sidebar ${mobileOpen ? 'is-open' : ''}`}>
