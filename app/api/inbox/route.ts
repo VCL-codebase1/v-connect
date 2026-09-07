@@ -28,7 +28,7 @@ export async function GET(request: Request) { try {
   const raw = await evolutionRequest<any>(`/chat/findChats/${instance}`, { method: 'POST', body: {}, timeoutMs: 15_000 });
   const chats: InboxChat[] = rows(raw).flatMap(item => {
     const id = String(item.remoteJid ?? item.id ?? '');
-    if (!id.endsWith('@s.whatsapp.net') && !id.endsWith('@g.us')) return [];
+    if (!id.endsWith('@s.whatsapp.net') && !id.endsWith('@lid') && !id.endsWith('@g.us')) return [];
     const last = item.lastMessage ?? item.messages?.[0] ?? {};
     const phone = id.split('@')[0];
     return [{ id, name: item.name ?? item.pushName ?? item.contact?.pushName ?? (id.endsWith('@g.us') ? 'WhatsApp group' : `+${phone}`), preview: textOf(last), timestamp: Number(item.updatedAt ? new Date(item.updatedAt).getTime() / 1000 : last.messageTimestamp ?? 0), unread: Number(item.unreadMessages ?? item.unreadCount ?? 0), group: id.endsWith('@g.us') }];

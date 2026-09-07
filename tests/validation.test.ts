@@ -34,6 +34,7 @@ test('inbox requests accept only WhatsApp user and group identifiers', () => {
   const base = { workspaceId, numberId };
   assert.equal(inboxQuery.safeParse({ ...base, remoteJid: '2348012345678@s.whatsapp.net' }).success, true);
   assert.equal(inboxQuery.safeParse({ ...base, remoteJid: '120363025555555555@g.us' }).success, true);
+  assert.equal(inboxQuery.safeParse({ ...base, remoteJid: '225555555555555@lid' }).success, true);
   for (const remoteJid of ['../../instance/fetchInstances', 'person@example.com', 'status@broadcast', '123@evil.example']) assert.equal(inboxQuery.safeParse({ ...base, remoteJid }).success, false);
   assert.equal(inboxReply.safeParse({ ...base, remoteJid: '2348012345678@s.whatsapp.net', text: ' ' }).success, false);
 });
