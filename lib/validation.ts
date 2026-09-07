@@ -11,5 +11,15 @@ export const teamAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('accept'), token: z.uuid() }),
   z.object({ action: z.literal('remove'), workspaceId, userId: z.uuid() }),
 ]);
+export const contactsQuery = z.object({ workspaceId, numberId: z.uuid() });
+const broadcastRecipient = z.object({ phone: z.string().regex(/^\+?[1-9][0-9]{7,14}$/).transform(s => s.replace(/^\+/, '')), name: z.string().trim().max(120).optional() });
+export const broadcastAction = z.object({
+  workspaceId,
+  numberId: z.uuid(),
+  name: z.string().trim().min(2).max(80),
+  text: z.string().trim().min(1).max(4000),
+  confirmed: z.literal(true),
+  recipients: z.array(broadcastRecipient).min(1).max(25).transform(items => Array.from(new Map(items.map(item => [item.phone, item])).values())),
+});
 export function canManage(role: string | null | undefined) { return role === 'owner' || role === 'admin'; }
 export function safeNext(value: string | null) { return value && /^\/invite\?token=[0-9a-f-]{36}$/i.test(value) ? value : '/'; }

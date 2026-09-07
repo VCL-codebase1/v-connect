@@ -6,5 +6,6 @@ node_modules/
 .next/
 .vercel/
 *.tsbuildinfo
+v-connect-vercel.env
 .vercel
 .env*

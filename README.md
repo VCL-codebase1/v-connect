@@ -8,6 +8,8 @@ A mobile-friendly Next.js app for managing multiple WhatsApp numbers across tena
 - Owner, admin, and member access enforced in the API and PostgreSQL RLS.
 - Email/password login and email confirmation through Supabase Auth.
 - Multiple WhatsApp instances, connection status, QR device pairing, and individual text messages.
+- Live contacts per connected WhatsApp number and tenant-scoped broadcast history.
+- Permission-confirmed broadcasts for up to 25 recipients, limited to owners and admins.
 - Email-bound, single-use team invitation links and owner-controlled member removal.
 - Database-backed message/connect rate limits shared across serverless instances.
 - Responsive dashboard, mobile menu, search, filters, loading states, and accessible native dialogs.
@@ -30,12 +32,12 @@ ssh -N -L 8080:127.0.0.1:8080 root@76.13.62.161
 The existing project `iktenrvmriqzsmixafsc` is already configured and its schema is installed. Do not rerun the initial migration there. For a new project:
 
 1. Create a Supabase project, or use a dedicated existing project.
-2. Run `supabase/migrations/001_workspaces.sql` once in its SQL editor. This creates `vc_*` tables, RLS policies, and guarded RPCs. Do not run the test setup in your real project.
+2. Run `supabase/migrations/001_workspaces.sql`, followed by `supabase/migrations/002_broadcasts.sql`, once in its SQL editor. These create the `vc_*` tables, RLS policies, and guarded RPCs. Do not run the test setup in your real project.
 3. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to `.env.local` and Vercel. No service-role key is required.
 4. Enable email/password authentication and email confirmation. Configure production SMTP and Supabase authentication rate limits before inviting customers.
 5. In Auth → URL Configuration, set Site URL to your Vercel production URL and allow `https://v-connect-blond.vercel.app/auth/confirm` and `http://localhost:3000/auth/confirm` as redirect URLs. Set `APP_URL` to the app URL for each deployment environment.
 6. Default PKCE confirmation links work in the browser used to sign up. For cross-device confirmation, customize the confirmation template to point to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`. Users can reopen their invitation link after confirming.
-7. Sign up, confirm your email, sign in, and create a workspace. Owners/admins can add numbers and invite colleagues. All workspace members can send individual messages.
+7. Sign up, confirm your email, sign in, and create a workspace. Owners/admins can add numbers, invite colleagues, and send broadcasts. All workspace members can browse contacts and send individual messages.
 
 ## Deploy on Vercel
 
@@ -68,7 +70,9 @@ Database integration tests passed both in an isolated PostgreSQL 15 container an
 ## Operational limits
 
 - Supabase and public VPS HTTPS are connected. Real signup, confirmation, WhatsApp pairing, and message delivery still need end-to-end verification after you deploy and configure your final confirmation URLs. No real messages were sent during development.
-- This version sends individual text messages; it does not include a shared inbox, media messages, campaigns, billing, or incoming-message webhooks.
+- Contacts are fetched live from the selected Evolution instance and are not copied into Supabase. Only broadcast metadata, message text, and aggregate delivery counts are stored.
+- Broadcasts are capped at 25 recipients per run, two runs per minute, and 250 recipients per workspace per day. The app does not retry failed recipients automatically.
+- This version does not include a shared inbox, media messages, scheduled campaigns, billing, or incoming-message webhooks.
 - Each workspace can have 20 numbers and each user can own 10 workspaces. Limits are enforced in the database. The VPS’s practical capacity depends on traffic and message history.
 - QR pairing needs a second screen for scanning. Connection statuses update when opening a workspace or pressing refresh.
 - Provider instance creation and database creation are separate operations. If the provider is temporarily unavailable, the database keeps the number; Connect retries provisioning when the instance is missing.
@@ -76,4 +80,3 @@ Database integration tests passed both in an isolated PostgreSQL 15 container an
 - No customer data or real VPS credentials are embedded in the client. Client code never receives the global Evolution key.
 
 See `DEPLOYMENT.md` for VPS operations and backups.
-
