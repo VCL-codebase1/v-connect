@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 begin;
-insert into auth.users values
+insert into auth.users(id,email,email_confirmed_at) values
 ('11111111-1111-4111-8111-111111111111','owner1@example.com',now()),
 ('22222222-2222-4222-8222-222222222222','owner2@example.com',now()),
 ('33333333-3333-4333-8333-333333333333','member@example.com',now());

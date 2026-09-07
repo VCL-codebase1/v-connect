@@ -5,9 +5,9 @@ Deployment directory on VPS: `/opt/evolution-api`
 
 Evolution API runs in Docker Compose with PostgreSQL 15 and Redis 7. Data and WhatsApp sessions use persistent Docker volumes. Containers restart automatically and logs rotate. PostgreSQL and Redis have no host ports; the API currently listens on the VPS loopback interface at port 8080.
 
-## Access before a public HTTPS endpoint is configured
+## Access
 
-Keep this SSH tunnel running on your Mac:
+The public API endpoint is `https://vcglengineering.tech`, behind Caddy with automatic TLS renewal. The app deployment is user-managed; see `README.md` for the required environment values. To use the private loopback endpoint for troubleshooting, keep this SSH tunnel running on your Mac:
 
 ```bash
 ssh -N -L 8080:127.0.0.1:8080 root@76.13.62.161
@@ -17,7 +17,7 @@ Your local Next.js server can then use `http://localhost:8080`.
 
 ## Next.js
 
-The local `.env.local` contains `EVOLUTION_API_URL`, `EVOLUTION_API_ORIGIN`, and `EVOLUTION_API_KEY`. Keep these variables server-side; never use a `NEXT_PUBLIC_` prefix or expose the key to browser code. A remotely hosted Next.js app needs the pending public HTTPS endpoint. This version rejects requests without an allowed Origin header, including backend requests, so send the configured origin explicitly.
+The local `.env.local` contains `EVOLUTION_API_URL`, `EVOLUTION_API_ORIGIN`, and `EVOLUTION_API_KEY`. Keep these variables server-side; never use a `NEXT_PUBLIC_` prefix or expose the key to browser code. The deployed Next.js app uses the public HTTPS endpoint. This version rejects requests without an allowed Origin header, including backend requests, so send the configured origin explicitly.
 
 Example server-side request:
 
@@ -72,5 +72,5 @@ To restore, stop the API, preserve the current volumes and configuration, and re
 
 ## Pending
 
-- Choose a domain, point its A record at the VPS, and configure HTTPS.
+- Configure the Supabase email-confirmation redirect URLs in the dashboard (see `SETUP-STATUS.md`).
 - Pair a WhatsApp account and configure app-specific webhooks when the app URL is known.

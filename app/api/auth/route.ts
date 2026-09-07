@@ -8,7 +8,7 @@ const schema = z.discriminatedUnion('action', [
 ]);
 export async function POST(request: Request) { try {
   const input = schema.parse(await body(request));
-  if (!isConfigured()) throw new ApiError(503, 'Login is being set up. You can explore the demo workspace now.');
+  if (!isConfigured()) throw new ApiError(503, 'Authentication is not configured. Please check the server setup.');
   const db = await supabaseServer();
   if (input.action === 'signout') { const { error } = await db.auth.signOut(); if (error) throw new ApiError(502, 'Could not sign out. Try again.'); return json({ ok: true }); }
   if (input.action === 'signin') {
