@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowUpRight, BookUser, Check, ChevronDown, ChevronRight, CircleHelp, Copy, LayoutGrid, LoaderCircle, LogOut, Megaphone, Menu, MessageCircle, Plus, QrCode, RefreshCw, Search, Send, Settings2, ShieldCheck, Smartphone, Users, Wifi, X } from 'lucide-react';
+import { ArrowUpRight, BookUser, Check, ChevronDown, ChevronRight, CircleHelp, Copy, LayoutGrid, LoaderCircle, LogOut, Megaphone, Menu, MessageCircle, Paperclip, Plus, QrCode, RefreshCw, Search, Send, Settings2, ShieldCheck, Smartphone, Users, Wifi, X } from 'lucide-react';
 import type { Contact, DashboardData, WhatsAppNumber } from '@/lib/types';
 import { InboxPanel } from '@/components/inbox-panel';
 import { CampaignsPanel } from '@/components/campaigns-panel';
 import { countryCodes } from '@/lib/phone';
+import { mediaAccept, uploadMedia } from '@/lib/media';
 
 type Modal = 'number' | 'workspace' | 'invite' | 'pair' | 'message' | null;
 export function Dashboard({ initial }: { initial: DashboardData }) {
@@ -55,12 +56,13 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
   function open(next: Modal, number?: WhatsAppNumber) { setSelected(number ?? null); setQr(''); setInvite(''); setModal(next); }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const fields = Object.fromEntries(new FormData(event.currentTarget));
+    const form = new FormData(event.currentTarget);
+    const fields = Object.fromEntries(form);
     await run(async () => {
       if (modal === 'workspace') { const data = await request('/api/workspaces', { name: fields.name }); setWorkspaces(prev => [...prev, data.workspace]); setActive(data.workspace.id); }
       if (modal === 'number') { const data = await request('/api/numbers', { action: 'create', workspaceId: active, label: fields.label }); await refresh(); if (data.warning) setNotice(data.warning); }
       if (modal === 'invite') { const data = await request('/api/team', { action: 'invite', workspaceId: active, email: fields.email, role: fields.role }); setInvite(`${window.location.origin}/invite?token=${data.token}`); return; }
-      if (modal === 'message') { await request('/api/numbers', { action: 'send', workspaceId: active, numberId: selected?.id, phone: fields.phone, text: fields.text }); setNotice('Message accepted by WhatsApp.'); }
+      if (modal === 'message') { const file=form.get('media'); const media=file instanceof File&&file.size?await uploadMedia(active,file):undefined; await request('/api/numbers', { action: 'send', workspaceId: active, numberId: selected?.id, phone: fields.phone, countryCode: fields.countryCode, text: fields.text, media }); setNotice('Message accepted by WhatsApp.'); }
       setModal(null);
     });
   }
@@ -109,7 +111,7 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
         {modal === 'number' && <><p>Give this number a name your team will recognize. You’ll pair it with WhatsApp next.</p><label>Number name<input name="label" required maxLength={60} placeholder="e.g. Customer support" autoFocus/></label></>}
         {modal === 'workspace' && <><p>A separate space for your business, its numbers, and its people.</p><label>Workspace name<input name="name" required minLength={2} maxLength={60} placeholder="e.g. VCGL Engineering" autoFocus/></label></>}
         {modal === 'invite' && <><p>The invitation works only for this email and expires in seven days.</p><label>Email address<input name="email" type="email" required placeholder="teammate@company.com" autoFocus/></label><label>Role<select name="role"><option value="member">Member · send messages</option><option value="admin">Admin · manage numbers and invitations</option></select></label>{invite && <div className="invite-result"><input aria-label="Invitation link" readOnly value={invite}/><button type="button" className="button secondary" onClick={() => run(async () => { await navigator.clipboard.writeText(invite); setNotice('Invitation link copied.'); })}><Copy size={16}/>Copy link</button></div>}</>}
-        {modal === 'message' && <><p>Send an individual WhatsApp message from this workspace’s number.</p><label>Recipient number<div className="phone-field"><select name="countryCode" aria-label="Country code">{countryCodes.map(country=><option key={country.code} value={country.code}>{country.flag} +{country.code}</option>)}</select><input name="phone" type="tel" required minLength={7} maxLength={24} placeholder="0801 234 5678" autoFocus/></div><small>Enter the local number. We’ll add the selected country code.</small></label><label>Message<textarea name="text" required maxLength={4000} rows={5} placeholder="Write your message…"/></label></>}
+        {modal === 'message' && <><p>Send a message, photo, video, audio, or document.</p><label>Recipient number<div className="phone-field"><select name="countryCode" aria-label="Country code">{countryCodes.map(country=><option key={country.code} value={country.code}>{country.flag} +{country.code}</option>)}</select><input name="phone" type="tel" required minLength={7} maxLength={24} placeholder="0801 234 5678" autoFocus/></div><small>Enter the local number. We’ll add the selected country code.</small></label><label>Message or caption<textarea name="text" maxLength={4000} rows={5} placeholder="Write an optional caption…"/></label><label className="media-picker"><span><Paperclip size={17}/>Attach media</span><input name="media" type="file" accept={mediaAccept}/><small>Photo, video, audio, PDF, Word, Excel, CSV or text · up to 16 MB</small></label></>}
         <button className="button primary full" disabled={busy}>{busy ? <LoaderCircle size={18} className="spin"/> : modal === 'message' ? <Send size={17}/> : <Plus size={17}/>} {modal === 'number' ? 'Add number' : modal === 'workspace' ? 'Create workspace' : modal === 'invite' ? 'Create invitation link' : 'Send message'}</button>
       </form>}{notice && <div className="modal-notice" role="status">{notice}</div>}
     </Dialog>}

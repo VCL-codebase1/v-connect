@@ -2,10 +2,24 @@ import { authorize, body, failure, json, ApiError } from '@/lib/api';
 import { evolutionRequest } from '@/lib/evolution';
 import { inboxQuery, inboxReply, inboxTeamAction } from '@/lib/validation';
 import type { InboxChat, InboxMessage } from '@/lib/types';
+import { evolutionMediaBody, validateMediaUrl } from '@/lib/media-server';
 
 type UnknownRow = Record<string, any>;
 const rows = (value: any): UnknownRow[] => Array.isArray(value) ? value : Array.isArray(value?.records) ? value.records : Array.isArray(value?.messages?.records) ? value.messages.records : Array.isArray(value?.chats?.records) ? value.chats.records : [];
 const textOf = (message: UnknownRow) => message?.message?.conversation ?? message?.message?.extendedTextMessage?.text ?? message?.message?.imageMessage?.caption ?? message?.message?.videoMessage?.caption ?? (message?.message?.imageMessage ? 'Photo' : message?.message?.audioMessage ? 'Voice message' : message?.message?.documentMessage ? 'Document' : 'Message');
+const mediaOf = (item: UnknownRow): Partial<InboxMessage> => {
+  const message = item?.message ?? {};
+  const entries = [
+    ['image', message.imageMessage],
+    ['video', message.videoMessage],
+    ['audio', message.audioMessage],
+    ['document', message.documentMessage],
+  ] as const;
+  const match = entries.find(([, value]) => value);
+  if (!match) return {};
+  const [mediaType, value] = match;
+  return { mediaType, mediaUrl: value.url, fileName: value.fileName ?? value.title };
+};
 
 async function instanceFor(db: any, workspaceId: string, numberId: string) {
   const { data, error } = await db.from('vc_numbers').select('instance_name').eq('id', numberId).eq('workspace_id', workspaceId).single();
@@ -19,7 +33,7 @@ export async function GET(request: Request) { try {
   const instance = await instanceFor(db, input.workspaceId, input.numberId);
   if (input.remoteJid) {
     const raw = await evolutionRequest<any>(`/chat/findMessages/${instance}`, { method: 'POST', body: { where: { key: { remoteJid: input.remoteJid } }, page: 1, offset: 50 }, timeoutMs: 15_000 });
-    const messages: InboxMessage[] = rows(raw).map(item => ({ id: String(item.key?.id ?? item.id ?? crypto.randomUUID()), text: textOf(item), timestamp: Number(item.messageTimestamp ?? item.timestamp ?? 0), fromMe: Boolean(item.key?.fromMe), status: item.status })).sort((a, b) => a.timestamp - b.timestamp);
+    const messages: InboxMessage[] = rows(raw).map(item => ({ id: String(item.key?.id ?? item.id ?? crypto.randomUUID()), text: textOf(item), timestamp: Number(item.messageTimestamp ?? item.timestamp ?? 0), fromMe: Boolean(item.key?.fromMe), status: item.status, ...mediaOf(item) })).sort((a, b) => a.timestamp - b.timestamp);
     await db.rpc('vc_mark_conversation_read', { target: input.workspaceId, source_number: input.numberId, conversation_jid: input.remoteJid });
     const { data: conversation } = await db.from('vc_conversations').select('id,status,assigned_to').eq('workspace_id',input.workspaceId).eq('number_id',input.numberId).eq('remote_jid',input.remoteJid).maybeSingle();
     const { data: notes } = conversation ? await db.from('vc_conversation_notes').select('id,body,author_id,created_at').eq('conversation_id',conversation.id).order('created_at') : { data: [] };
@@ -52,6 +66,10 @@ export async function POST(request: Request) { try {
   const { data: permitted, error } = await db.rpc('vc_consume_action', { target: input.workspaceId, action_name: 'send' });
   if (error || !permitted) throw new ApiError(429, 'Too many messages. Please wait a minute.');
   const destination = input.remoteJid.endsWith('@s.whatsapp.net') ? input.remoteJid.split('@')[0] : input.remoteJid;
-  await evolutionRequest(`/message/sendText/${instance}`, { method: 'POST', body: { number: destination, text: input.text } });
+  const media = input.media ? validateMediaUrl(input.media) : undefined;
+  await evolutionRequest(media ? `/message/sendMedia/${instance}` : `/message/sendText/${instance}`, {
+    method: 'POST',
+    body: media ? evolutionMediaBody(destination, input.text, media) : { number: destination, text: input.text },
+  });
   return json({ accepted: true }, 201);
 } catch (e) { return failure(e); } }

@@ -1,6 +1,7 @@
 import { authorize, body, failure, json, ApiError } from '@/lib/api';
 import { numberAction } from '@/lib/validation';
 import { evolutionRequest, EvolutionError } from '@/lib/evolution';
+import { evolutionMediaBody, validateMediaUrl } from '@/lib/media-server';
 export const maxDuration = 60;
 async function provision(instanceName: string) {
   return evolutionRequest('/instance/create', { method: 'POST', body: { instanceName, integration: 'WHATSAPP-BAILEYS', qrcode: false } });
@@ -28,6 +29,10 @@ export async function POST(request: Request) { try {
     const base64 = data.base64?.match(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/) ? data.base64 : undefined;
     return json({ base64, connected: data.instance?.state === 'open' });
   }
-  await evolutionRequest(`/message/sendText/${name}`, { method: 'POST', body: { number: input.phone, text: input.text } });
+  const media = input.media ? validateMediaUrl(input.media) : undefined;
+  await evolutionRequest(media ? `/message/sendMedia/${name}` : `/message/sendText/${name}`, {
+    method: 'POST',
+    body: media ? evolutionMediaBody(input.phone, input.text, media) : { number: input.phone, text: input.text },
+  });
   return json({ accepted: true });
 } catch (e) { return failure(e); } }

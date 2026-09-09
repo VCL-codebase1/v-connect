@@ -25,7 +25,7 @@ async function claim() {
   const client=await pool.connect();
   try {
     await client.query('begin');
-    const result=await client.query(`select r.id,r.campaign_id,r.phone,r.name,r.variables,r.attempts,c.message_template,c.number_id,n.instance_name
+    const result=await client.query(`select r.id,r.campaign_id,r.phone,r.name,r.variables,r.attempts,c.message_template,c.number_id,c.media_url,c.media_type,c.media_mime_type,c.media_file_name,n.instance_name
       from public.vc_campaign_recipients r
       join public.vc_campaigns c on c.id=r.campaign_id
       join public.vc_numbers n on n.id=c.number_id
@@ -45,7 +45,10 @@ async function send(item) {
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),15000);
   try {
-    const response=await fetch(`${process.env.EVOLUTION_API_URL.replace(/\/$/,'')}/message/sendText/${encodeURIComponent(item.instance_name)}`,{method:'POST',headers:{apikey:process.env.EVOLUTION_API_KEY,Origin:process.env.EVOLUTION_API_ORIGIN??'https://v-connect-blond.vercel.app','Content-Type':'application/json'},body:JSON.stringify({number:item.phone,text:renderMessage(item.message_template,item)}),redirect:'error',signal:controller.signal});
+    const text=renderMessage(item.message_template,item);
+    const endpoint=item.media_url?'sendMedia':'sendText';
+    const requestPayload=item.media_url?{number:item.phone,mediatype:item.media_type,mimetype:item.media_mime_type,caption:text,media:item.media_url,fileName:item.media_file_name}:{number:item.phone,text};
+    const response=await fetch(`${process.env.EVOLUTION_API_URL.replace(/\/$/,'')}/message/${endpoint}/${encodeURIComponent(item.instance_name)}`,{method:'POST',headers:{apikey:process.env.EVOLUTION_API_KEY,Origin:process.env.EVOLUTION_API_ORIGIN??'https://v-connect-blond.vercel.app','Content-Type':'application/json'},body:JSON.stringify(requestPayload),redirect:'error',signal:controller.signal});
     if(!response.ok) return {ok:false,retry:retryableStatus(response.status),code:`evolution_${response.status}`};
     const payload=await response.json().catch(()=>({}));
     return {ok:true,id:providerMessageId(payload)};

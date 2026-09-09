@@ -164,6 +164,30 @@
   grid-column: 1 / -1;
 }
 
+.media-picker {
+  display: grid;
+  gap: 7px;
+  padding: 15px;
+  border: 1px dashed #b8d8cf;
+  border-radius: 15px;
+  background: #f6fbfa;
+  cursor: pointer;
+}
+.media-picker > span { display:flex; align-items:center; gap:8px; color:#247866; font-weight:750; }
+.media-picker input { width:100%; min-height:auto; padding:0; border:0; background:transparent; }
+.campaign-media { align-content:start; }
+.remove-media { align-self:start; border:0; background:transparent; color:#b44545; font:inherit; font-size:13px; cursor:pointer; padding:0; }
+
+.reply-box:has(.reply-attachment) { display:grid; grid-template-columns:auto minmax(0,1fr) auto; }
+.reply-attachment { grid-column:1/-1; display:flex; align-items:center; gap:7px; min-width:0; padding:8px 10px; border-radius:10px; background:#eef8f5; color:#246d60; font-size:13px; }
+.reply-attachment span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.reply-attachment button { margin-left:auto; display:grid; place-items:center; border:0; background:transparent; color:inherit; cursor:pointer; }
+.reply-file { display:grid; place-items:center; cursor:pointer; color:#54736c; }
+.reply-file input { display:none; }
+.message-media { display:block; width:min(320px,100%); max-height:300px; object-fit:contain; border-radius:11px; margin-bottom:7px; }
+.message-audio { display:block; width:min(300px,100%); margin-bottom:6px; }
+.message-document { display:flex; align-items:center; gap:8px; padding:10px; margin-bottom:6px; border-radius:10px; background:rgba(255,255,255,.55); color:inherit; text-decoration:none; font-weight:700; }
+
 .inline-country {
   display: flex;
   align-items: center;

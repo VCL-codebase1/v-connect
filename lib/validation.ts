@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { normalizePhone } from '@/lib/phone';
 export const workspaceId = z.uuid();
 export const name = z.string().trim().min(2).max(60);
-const sendMessage = z.object({ action: z.literal('send'), workspaceId, numberId: z.uuid(), phone: z.string().min(7).max(24), countryCode: z.string().regex(/^[1-9][0-9]{0,3}$/).default('234'), text: z.string().trim().min(1).max(4000) }).refine(value => { try { normalizePhone(value.phone,value.countryCode); return true; } catch { return false; } }, { path:['phone'], message:'Invalid phone number' }).transform(value => ({ ...value, phone: normalizePhone(value.phone,value.countryCode) }));
+export const mediaAttachment = z.object({ url:z.url().max(2048),type:z.enum(['image','video','audio','document']),mimeType:z.string().trim().min(3).max(120),fileName:z.string().trim().min(1).max(180) });
+const sendMessage = z.object({ action: z.literal('send'), workspaceId, numberId: z.uuid(), phone: z.string().min(7).max(24), countryCode: z.string().regex(/^[1-9][0-9]{0,3}$/).default('234'), text: z.string().trim().max(4000).default(''), media:mediaAttachment.optional() }).refine(value => value.text.length>0||Boolean(value.media),{path:['text'],message:'Add a message or attachment'}).refine(value => { try { normalizePhone(value.phone,value.countryCode); return true; } catch { return false; } }, { path:['phone'], message:'Invalid phone number' }).transform(value => ({ ...value, phone: normalizePhone(value.phone,value.countryCode) }));
 export const numberAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), workspaceId, label: z.string().trim().min(1).max(60) }),
   z.object({ action: z.literal('connect'), workspaceId, numberId: z.uuid() }),
@@ -16,7 +17,7 @@ export const teamAction = z.discriminatedUnion('action', [
 export const contactsQuery = z.object({ workspaceId, numberId: z.uuid() });
 export const remoteJid = z.string().regex(/^([1-9][0-9]{7,24}@(s\.whatsapp\.net|lid)|[0-9-]{8,40}@g\.us)$/);
 export const inboxQuery = z.object({ workspaceId, numberId: z.uuid(), remoteJid: remoteJid.optional() });
-export const inboxReply = z.object({ workspaceId, numberId: z.uuid(), remoteJid, text: z.string().trim().min(1).max(4000) });
+export const inboxReply = z.object({ workspaceId, numberId: z.uuid(), remoteJid, text: z.string().trim().max(4000).default(''), media:mediaAttachment.optional() }).refine(value=>value.text.length>0||Boolean(value.media),{path:['text'],message:'Add a message or attachment'});
 export const inboxTeamAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('update'), workspaceId, numberId: z.uuid(), remoteJid, status: z.enum(['open','pending','resolved']), assignedTo: z.uuid().nullable() }),
   z.object({ action: z.literal('note'), workspaceId, numberId: z.uuid(), remoteJid, text: z.string().trim().min(1).max(2000) }),
@@ -27,6 +28,7 @@ export const broadcastAction = z.object({
   numberId: z.uuid(),
   name: z.string().trim().min(2).max(80),
   text: z.string().trim().min(1).max(4000),
+  media: mediaAttachment.optional(),
   confirmed: z.literal(true),
   recipients: z.array(broadcastRecipient).min(1).max(25).transform(items => Array.from(new Map(items.map(item => [item.phone, item])).values())),
 });
@@ -40,11 +42,12 @@ export const createCampaign = z.object({
   workspaceId,
   numberId: z.uuid(),
   name: z.string().trim().min(2).max(80),
-  text: z.string().trim().min(1).max(4000),
+  text: z.string().trim().max(4000).default(''),
+  media: mediaAttachment.optional(),
   scheduledFor: z.iso.datetime().nullable().default(null),
   confirmed: z.literal(true),
   recipients: z.array(campaignRecipient).min(1).max(5000).transform(items => Array.from(new Map(items.map(item => [item.phone, item])).values())),
-});
+}).refine(value=>value.text.length>0||Boolean(value.media),{path:['text'],message:'Add a message or attachment'});
 export const campaignAction = z.discriminatedUnion('action', [
   createCampaign,
   z.object({ action: z.enum(['pause','resume','cancel']), workspaceId, campaignId: z.uuid() }),
