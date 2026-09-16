@@ -2,7 +2,7 @@ import { authorize, body, failure, json, ApiError } from '@/lib/api';
 import { campaignAction, workspaceId } from '@/lib/validation';
 import { validateMediaUrl } from '@/lib/media-server';
 
-const campaignColumns = 'id,name,message_template,status,scheduled_for,recipient_count,queued_count,sent_count,failed_count,suppressed_count,created_at,started_at,completed_at,media_url,media_type,media_mime_type,media_file_name,vc_numbers(label)';
+const campaignColumns = 'id,name,message_template,status,scheduled_for,recipient_count,queued_count,sent_count,failed_count,suppressed_count,created_at,started_at,completed_at,pause_reason,cta,media_url,media_type,media_mime_type,media_file_name,vc_numbers(label)';
 
 export async function GET(request: Request) {
   try {
@@ -35,9 +35,12 @@ export async function POST(request: Request) {
         : db.rpc('vc_create_campaign',{ target: input.workspaceId, source_number: input.numberId, campaign_name: input.name, campaign_message: input.text, send_at: input.scheduledFor, recipients: input.recipients });
       const { data: id, error } = await request;
       if (error || !id) throw new ApiError(400,'Campaign could not be created.');
+      if (input.cta) { const { error: ctaError } = await db.rpc('vc_set_campaign_cta',{ target: input.workspaceId, campaign: id, config: input.cta }); if (ctaError) throw new ApiError(400,'Campaign CTA could not be saved.'); }
       return json({ id, status: input.scheduledFor && new Date(input.scheduledFor)>new Date() ? 'scheduled' : 'queued' },201);
     }
-    const { error } = await db.rpc('vc_campaign_action',{ target: input.workspaceId, campaign: input.campaignId, next_action: input.action });
+    const { error } = input.action==='retry_failed'
+      ? await db.rpc('vc_retry_failed_campaign',{ target: input.workspaceId, campaign: input.campaignId })
+      : await db.rpc('vc_campaign_action',{ target: input.workspaceId, campaign: input.campaignId, next_action: input.action });
     if (error) throw new ApiError(400,error.message);
     return json({ ok: true });
   } catch (error) { return failure(error); }

@@ -5,19 +5,25 @@ import { safeNext } from '@/lib/validation';
 const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('signout') }),
   z.object({ action: z.enum(['signin','signup']), email: z.email().max(254), password: z.string().min(8).max(128), next: z.string().optional() }),
+  z.object({ action: z.literal('resend'), email: z.email().max(254), next: z.string().optional() }),
 ]);
 export async function POST(request: Request) { try {
   const input = schema.parse(await body(request));
   if (!isConfigured()) throw new ApiError(503, 'Authentication is not configured. Please check the server setup.');
   const db = await supabaseServer();
   if (input.action === 'signout') { const { error } = await db.auth.signOut(); if (error) throw new ApiError(502, 'Could not sign out. Try again.'); return json({ ok: true }); }
+  const origin = process.env.APP_URL ?? new URL(request.url).origin;
+  const next = safeNext(input.next ?? null);
+  if (input.action === 'resend') {
+    const { error } = await db.auth.resend({ type: 'signup', email: input.email, options: { emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}` } });
+    if (error) throw new ApiError(400, 'A confirmation email could not be sent yet. Please wait a moment and try again.');
+    return json({ message: 'Confirmation email sent. Check your inbox and spam folder.' });
+  }
   if (input.action === 'signin') {
     const { error } = await db.auth.signInWithPassword({ email: input.email, password: input.password });
     if (error) throw new ApiError(400, 'Could not sign in. Check your email, password, and email confirmation.');
     return json({ redirect: safeNext(input.next ?? null) });
   }
-  const origin = process.env.APP_URL ?? new URL(request.url).origin;
-  const next = safeNext(input.next ?? null);
   const { data, error } = await db.auth.signUp({ email: input.email, password: input.password, options: { emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}` } });
   if (error) throw new ApiError(400, 'Could not create your account. Please try again shortly.');
   return json(data.session ? { redirect: next } : { message: 'Check your email to confirm your account, then sign in.' });

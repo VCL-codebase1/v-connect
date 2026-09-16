@@ -78,7 +78,7 @@ Database integration tests passed both in an isolated PostgreSQL 15 container an
 - Supabase and public VPS HTTPS are connected. Real signup, confirmation, WhatsApp pairing, and message delivery still need end-to-end verification after you deploy and configure your final confirmation URLs. No real messages were sent during development.
 - Contacts are fetched live from the selected Evolution instance. Contacts imported into a saved campaign audience are stored in Supabase with their consent source and time.
 - Inbox message contents remain in Evolution API. Supabase stores one-day refresh signals only. Opening an inbox as an owner or admin configures that instance’s signed webhook after the app has a public HTTPS `APP_URL`.
-- Campaigns are capped at 5,000 recipients. The worker paces deliveries at three seconds by default, retries only explicit throttling/server failures up to three attempts, and does not retry ambiguous timeouts to avoid duplicate messages.
+- Campaigns are capped at 5,000 recipients. The worker sends up to 20 successful messages per window by default, then cools down for 10 minutes. Provider rate limits/server errors pause the campaign with recipients preserved for recovery; retry failed recipients only after reconnecting the number. Ambiguous timeouts are not retried automatically to avoid duplicates.
 - The inbox is read on demand from Evolution API. It currently uses manual refresh; incoming-message webhooks or realtime updates are not configured yet.
 - This version does not include media campaigns, billing, or automatic opt-out keyword detection.
 - Each workspace can have 20 numbers and each user can own 10 workspaces. Limits are enforced in the database. The VPS’s practical capacity depends on traffic and message history.

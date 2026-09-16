@@ -8,6 +8,10 @@ const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUna
 const workerId=(process.env.WORKER_ID??`worker-${process.pid}`).slice(0,80);
 const interval=Math.max(1000,Number(process.env.SEND_INTERVAL_MS??3000));
 const pollInterval=Math.max(1000,Number(process.env.POLL_INTERVAL_MS??2500));
+const windowSize=Math.max(1,Number(process.env.WINDOW_SIZE??20));
+const cooldownMs=Math.max(0,Number(process.env.COOLDOWN_MS??600000));
+let windowSent=0;
+let windowStarted=Date.now();
 let stopping=false;
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -25,7 +29,7 @@ async function claim() {
   const client=await pool.connect();
   try {
     await client.query('begin');
-    const result=await client.query(`select r.id,r.campaign_id,r.phone,r.name,r.variables,r.attempts,c.message_template,c.number_id,c.media_url,c.media_type,c.media_mime_type,c.media_file_name,n.instance_name
+    const result=await client.query(`select r.id,r.campaign_id,r.phone,r.name,r.variables,r.attempts,c.message_template,c.number_id,c.cta,c.media_url,c.media_type,c.media_mime_type,c.media_file_name,n.instance_name
       from public.vc_campaign_recipients r
       join public.vc_campaigns c on c.id=r.campaign_id
       join public.vc_numbers n on n.id=c.number_id
@@ -46,10 +50,11 @@ async function send(item) {
   const timer=setTimeout(()=>controller.abort(),15000);
   try {
     const text=renderMessage(item.message_template,item);
-    const endpoint=item.media_url?'sendMedia':'sendText';
-    const requestPayload=item.media_url?{number:item.phone,mediatype:item.media_type,mimetype:item.media_mime_type,caption:text,media:item.media_url,fileName:item.media_file_name}:{number:item.phone,text};
+    const endpoint=item.cta?'sendButtons':item.media_url?'sendMedia':'sendText';
+    const requestPayload=item.cta?{number:item.phone,title:item.cta.title,description:item.cta.description,footer:item.cta.footer,buttons:item.cta.buttons}:{number:item.phone,mediatype:item.media_type,mimetype:item.media_mime_type,caption:text,media:item.media_url,fileName:item.media_file_name};
+    if(!item.cta&&!item.media_url) requestPayload.text=text;
     const response=await fetch(`${process.env.EVOLUTION_API_URL.replace(/\/$/,'')}/message/${endpoint}/${encodeURIComponent(item.instance_name)}`,{method:'POST',headers:{apikey:process.env.EVOLUTION_API_KEY,Origin:process.env.EVOLUTION_API_ORIGIN??'https://v-connect-blond.vercel.app','Content-Type':'application/json'},body:JSON.stringify(requestPayload),redirect:'error',signal:controller.signal});
-    if(!response.ok) return {ok:false,retry:retryableStatus(response.status),code:`evolution_${response.status}`};
+    if(!response.ok) return {ok:false,retry:retryableStatus(response.status),pause:response.status===429||response.status>=500,code:`evolution_${response.status}`};
     const payload=await response.json().catch(()=>({}));
     return {ok:true,id:providerMessageId(payload)};
   } catch(error) {
@@ -63,10 +68,11 @@ async function finish(item,result) {
   try {
     await client.query('begin');
     const mayRetry=!result.ok&&result.retry&&item.attempts+1<3;
-    await client.query(`update public.vc_campaign_recipients set status=$2,provider_message_id=$3,error_code=$4,sent_at=case when $2='sent' then now() else null end,locked_at=null,worker_id=null where id=$1 and worker_id=$5`,[item.id,result.ok?'sent':mayRetry?'queued':'failed',result.ok?result.id:null,result.ok?null:result.code,workerId]);
+    const nextStatus=result.pause?'queued':result.ok?'sent':mayRetry?'queued':'failed';
+    await client.query(`update public.vc_campaign_recipients set status=$2,provider_message_id=$3,error_code=$4,sent_at=case when $2='sent' then now() else null end,locked_at=null,worker_id=null where id=$1 and worker_id=$5`,[item.id,nextStatus,result.ok?result.id: null,result.ok?null:result.code,workerId]);
     const counts=await client.query(`select count(*) filter(where status in('queued','processing'))::int pending,count(*) filter(where status='sent')::int sent,count(*) filter(where status='failed')::int failed,count(*) filter(where status='suppressed')::int suppressed from public.vc_campaign_recipients where campaign_id=$1`,[item.campaign_id]);
     const count=counts.rows[0];
-    await client.query(`update public.vc_campaigns set queued_count=$2,sent_count=$3,failed_count=$4,suppressed_count=$5,status=case when $2=0 and status not in('paused','cancelled') then case when $3=0 and $4>0 then 'failed' else 'completed' end else status end,completed_at=case when $2=0 and status not in('paused','cancelled') then now() else completed_at end where id=$1`,[item.campaign_id,count.pending,count.sent,count.failed,count.suppressed]);
+    await client.query(`update public.vc_campaigns set queued_count=$2,sent_count=$3,failed_count=$4,suppressed_count=$5,status=case when $6 then 'paused' when $2=0 and status not in('paused','cancelled') then case when $3=0 and $4>0 then 'failed' else 'completed' end else status end,pause_reason=case when $6 then $7 else pause_reason end,completed_at=case when $6 then null when $2=0 and status not in('paused','cancelled') then now() else completed_at end where id=$1`,[item.campaign_id,count.pending,count.sent,count.failed,count.suppressed,Boolean(result.pause),result.pause?'Evolution API is rate-limiting or has lost the WhatsApp connection. Reconnect the number before resuming.':null]);
     await client.query('commit');
   } catch(error){await client.query('rollback');throw error;} finally{client.release();}
 }
@@ -75,7 +81,10 @@ async function main(){
   await prepareQueue();
   console.log(`Campaign worker ${workerId} started`);
   while(!stopping){
-    try{const item=await claim();if(!item){await prepareQueue();await sleep(pollInterval);continue;}const result=await send(item);await finish(item,result);await sleep(interval);}catch(error){console.error('Campaign worker cycle failed',error instanceof Error?error.message:'unknown error');await sleep(pollInterval);}
+    try{
+      if(windowSent>=windowSize){const elapsed=Date.now()-windowStarted;if(elapsed<cooldownMs){await sleep(Math.min(cooldownMs-elapsed,30000));continue;}windowSent=0;windowStarted=Date.now();}
+      const item=await claim();if(!item){await prepareQueue();await sleep(pollInterval);continue;}const result=await send(item);await finish(item,result);if(result.ok)windowSent+=1;await sleep(interval);
+    }catch(error){console.error('Campaign worker cycle failed',error instanceof Error?error.message:'unknown error');await sleep(pollInterval);}
   }
 }
 

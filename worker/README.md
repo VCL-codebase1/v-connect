@@ -1,6 +1,8 @@
 # Campaign worker
 
-This single worker delivers queued `vc_campaign_recipients` through Evolution API. It uses PostgreSQL row locks, so a recipient is claimed atomically. Keep one worker process for now; `SEND_INTERVAL_MS=3000` spaces messages from all connected numbers by three seconds.
+This single worker delivers queued `vc_campaign_recipients` through Evolution API. It uses PostgreSQL row locks, so a recipient is claimed atomically. Keep one worker process for now. By default it sends 20 successful messages, waits 10 minutes, and repeats. `SEND_INTERVAL_MS=3000` spaces individual attempts by three seconds; `WINDOW_SIZE` and `COOLDOWN_MS` can be adjusted in the VPS `.env`.
+
+The worker pauses a campaign when Evolution returns a rate-limit or server error. The current recipient remains queued, and an owner/admin can reconnect the WhatsApp number and use **Retry failed** or **Resume** from the campaign screen. This reduces accidental continuation after a WhatsApp restriction; it cannot guarantee that WhatsApp will accept bulk messaging.
 
 Docker is the preferred installation on the Evolution VPS:
 

@@ -3,6 +3,7 @@ import { normalizePhone } from '@/lib/phone';
 export const workspaceId = z.uuid();
 export const name = z.string().trim().min(2).max(60);
 export const mediaAttachment = z.object({ url:z.url().max(2048),type:z.enum(['image','video','audio','document']),mimeType:z.string().trim().min(3).max(120),fileName:z.string().trim().min(1).max(180) });
+export const campaignCta = z.object({ title:z.string().trim().max(80).default(''), description:z.string().trim().max(1024).default(''), footer:z.string().trim().max(80).default(''), buttons:z.array(z.object({ id:z.string().regex(/^[a-zA-Z0-9_-]{1,40}$/), displayText:z.string().trim().min(1).max(20), type:z.enum(['reply','url','call']).default('reply'), url:z.url().optional(), phoneNumber:z.string().regex(/^[1-9][0-9]{7,14}$/).optional() })).min(1).max(3) });
 const sendMessage = z.object({ action: z.literal('send'), workspaceId, numberId: z.uuid(), phone: z.string().min(7).max(24), countryCode: z.string().regex(/^[1-9][0-9]{0,3}$/).default('234'), text: z.string().trim().max(4000).default(''), media:mediaAttachment.optional() }).refine(value => value.text.length>0||Boolean(value.media),{path:['text'],message:'Add a message or attachment'}).refine(value => { try { normalizePhone(value.phone,value.countryCode); return true; } catch { return false; } }, { path:['phone'], message:'Invalid phone number' }).transform(value => ({ ...value, phone: normalizePhone(value.phone,value.countryCode) }));
 export const numberAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), workspaceId, label: z.string().trim().min(1).max(60) }),
@@ -29,6 +30,7 @@ export const broadcastAction = z.object({
   name: z.string().trim().min(2).max(80),
   text: z.string().trim().min(1).max(4000),
   media: mediaAttachment.optional(),
+  cta: campaignCta.optional(),
   confirmed: z.literal(true),
   recipients: z.array(broadcastRecipient).min(1).max(25).transform(items => Array.from(new Map(items.map(item => [item.phone, item])).values())),
 });
@@ -44,13 +46,14 @@ export const createCampaign = z.object({
   name: z.string().trim().min(2).max(80),
   text: z.string().trim().max(4000).default(''),
   media: mediaAttachment.optional(),
+  cta: campaignCta.optional(),
   scheduledFor: z.iso.datetime().nullable().default(null),
   confirmed: z.literal(true),
   recipients: z.array(campaignRecipient).min(1).max(5000).transform(items => Array.from(new Map(items.map(item => [item.phone, item])).values())),
 }).refine(value=>value.text.length>0||Boolean(value.media),{path:['text'],message:'Add a message or attachment'});
 export const campaignAction = z.discriminatedUnion('action', [
   createCampaign,
-  z.object({ action: z.enum(['pause','resume','cancel']), workspaceId, campaignId: z.uuid() }),
+  z.object({ action: z.enum(['pause','resume','cancel','retry_failed']), workspaceId, campaignId: z.uuid() }),
 ]);
 const audienceContact = campaignRecipient.extend({
   optedInAt: z.iso.datetime().default(() => new Date().toISOString()),
